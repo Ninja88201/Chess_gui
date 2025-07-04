@@ -1,12 +1,16 @@
+use std::{ops::RangeInclusive, time::Instant};
+
 use chess_engine::search::find_best_move;
 use chess_lib::{Board, Tile};
-use egui::{Context, Layout, RichText, TextureHandle, Ui, Vec2};
+use egui::{Context, Layout, RichText, Slider, TextureHandle, Ui, Vec2};
 use rand::rngs::ThreadRng;
 
 mod helper;
 mod render;
 mod state;
 use state::PlayState;
+
+use crate::play::state::Engine;
 mod input;
 
 pub struct PlayTab
@@ -19,8 +23,11 @@ pub struct PlayTab
     pub flipped: bool,
     pub selected: Option<Tile>,
 
-    pub engine_plays: Option<bool>,
+    pub engine_plays: Engine,
     pub auto_queen: bool,
+    last_frame_time: Instant,
+    engine_timer: f32,
+    pub seconds_per_move: f32,
 
     pub split_ratio: f32,
 
@@ -28,6 +35,7 @@ pub struct PlayTab
     pub board_size: f32,
 
     pub state: PlayState,
+    pub show_popup: bool,
     pub should_close: bool,
     
 }
@@ -47,8 +55,11 @@ impl PlayTab
             flipped: false,
             selected: None,
             
-            engine_plays: None,
+            engine_plays: Engine::Neither,
             auto_queen: false,
+            last_frame_time: Instant::now(),
+            engine_timer: 0.0,
+            seconds_per_move: 1.0,
 
             split_ratio: 0.5,
 
@@ -56,19 +67,49 @@ impl PlayTab
             board_size: 400.0,
 
             state: PlayState::Playing(chess_lib::GameState::Playing),
+            show_popup: true,
             should_close: false,
 
         }
 
     }
+    pub fn resest(&mut self) {
+        self.board = Board::new();
+        self.view_board = Board::new();
+
+        self.state = PlayState::Playing(chess_lib::GameState::Playing);
+        self.show_popup = true;
+    }
+    pub fn engine_turn(&self) -> bool {
+        let engine = self.engine_plays;
+        if engine == Engine::Neither {
+            return false;
+        }
+        if engine == Engine::Both {
+            return true;
+        }
+        let turn = self.board.white_turn;
+        if (turn && engine == Engine::White) || (!turn && engine == Engine::Black) {
+            return true;
+        }
+        unreachable!()
+    }
     pub fn render(&mut self, ctx: &Context) {
-        // Let the engine make it's move
-        if let Some(w) = self.engine_plays {
-            if self.board.white_turn == w {
-                let mov = find_best_move(&mut self.board, 4);
-                if let Some(m) = mov {
+        let now = Instant::now();
+        let dt = now.duration_since(self.last_frame_time).as_secs_f32();
+        self.last_frame_time = now;
+
+        self.engine_timer += dt;
+
+        if self.engine_turn()  {
+            if self.engine_timer >= self.seconds_per_move {
+                self.engine_timer = 0.0;
+
+                if let Some(m) = find_best_move(&mut self.board, 4) {
                     self.board.make_move_unchecked(m);
                 }
+            } else {
+                ctx.request_repaint();
             }
         }
 
@@ -97,6 +138,7 @@ impl PlayTab
         // Render history first as render_board can modify history part way through a frame
         self.render_history(ctx);
         self.render_board(ctx);
+        self.render_game_over(ctx);
     }
     fn separator_drag(
         &mut self,
@@ -304,7 +346,11 @@ impl PlayTab
             .show(ui, |ui| {
                 self.render_engine_side_selector(ui);
                 ui.add_space(8.0);
-                ui.checkbox(&mut self.auto_queen, "Auto-queen:")
+                ui.checkbox(&mut self.auto_queen, "Auto-queen:");
+                ui.add_space(8.0);
+                ui.label("Seconds/Move");
+                let slider = Slider::new(&mut self.seconds_per_move, RangeInclusive::new(0.1, 5.0));
+                ui.add(slider);
         });
     }
     pub fn render_board(&mut self, ctx: &Context) {

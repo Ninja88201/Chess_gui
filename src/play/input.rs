@@ -1,3 +1,4 @@
+
 use chess_lib::{Board, MoveList, MoveResult, Tile};
 use egui::{InputState, Key, Pos2, Response};
 use rand::Rng;
@@ -10,6 +11,9 @@ use crate::play::{state::PlayState, PlayTab};
 impl PlayTab {
     pub fn move_input(&mut self, response: Response, origin: Pos2) {
         if !response.clicked() {
+            return;
+        }
+        if self.engine_turn() {
             return;
         }
 
@@ -47,6 +51,7 @@ impl PlayTab {
                     MoveResult::MoveApplied(game_state) => {
                         self.state = PlayState::Playing(game_state);
                         self.selected = None;
+                        self.engine_timer = 0.0
                     }
                     MoveResult::PromotionNeeded(tile) => {
                         self.state = PlayState::Promotion(tile);

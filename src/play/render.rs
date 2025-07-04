@@ -1,7 +1,9 @@
-use chess_lib::{Board, MoveList, Piece, Tile};
-use egui::{Color32, ComboBox, Painter, Pos2, RichText, Ui, Vec2};
+use std::time::Instant;
 
-use crate::play::{state::PlayState, PlayTab};
+use chess_lib::{Board, MoveList, Piece, Tile};
+use egui::{Color32, ComboBox, Context, Painter, Pos2, RichText, Ui, Vec2};
+
+use crate::play::{state::{Engine, PlayState}, PlayTab};
 
 impl PlayTab
 {
@@ -39,34 +41,48 @@ impl PlayTab
         }
     }
 
-    pub fn render_engine_side_selector(&mut self, ui: &mut Ui) {
-        let available_size = ui.available_size();
+   pub fn render_engine_side_selector(&mut self, ui: &mut egui::Ui) {
+    let available_size = ui.available_size();
 
-        let font_size = (available_size.x.min(available_size.y) * 0.1).clamp(12.0, 14.0);
-        let combo_size = egui::vec2(
-            available_size.x * 0.8, 
-            available_size.y * 0.8
-        );
+    let font_size = (available_size.x.min(available_size.y) * 0.1).clamp(12.0, 14.0);
+    let combo_size = egui::vec2(
+        available_size.x * 0.8,
+        available_size.y * 0.8,
+    );
 
-        ui.vertical(|ui| {
-            ui.label(RichText::new("Engine plays").size(font_size));
+    let old_engine_plays = self.engine_plays;
 
-            ui.add_space(4.0);
+    ui.vertical(|ui| {
+        ui.label(RichText::new("Engine plays").size(font_size));
+        ui.add_space(4.0);
 
-            ComboBox::from_id_salt("engine_side_selector")
-                .selected_text(match self.engine_plays {
-                    Some(w) => if w { "White" } else { "Black" },
-                    None => "Neither",
-                })
-                .width(combo_size.x)
-                .height(combo_size.y)
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut self.engine_plays, Some(true), RichText::new("White").size(font_size));
-                    ui.selectable_value(&mut self.engine_plays, Some(false), RichText::new("Black").size(font_size));
-                    ui.selectable_value(&mut self.engine_plays, None, RichText::new("Neither").size(font_size));
-                });
+        ComboBox::from_id_salt("engine_side_selector")
+            .selected_text(self.engine_plays.to_string())
+            .width(combo_size.x)
+            .height(combo_size.y)
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut self.engine_plays, Engine::White, RichText::new("White").size(font_size));
+                ui.selectable_value(&mut self.engine_plays, Engine::Black, RichText::new("Black").size(font_size));
+                ui.selectable_value(&mut self.engine_plays, Engine::Neither, RichText::new("Neither").size(font_size));
+                ui.selectable_value(&mut self.engine_plays, Engine::Both, RichText::new("Both").size(font_size));
             });
+
+        // Countdown display
+        if self.engine_turn() {
+                let remaining = (self.seconds_per_move - self.engine_timer).max(0.0);
+                let progress = (self.engine_timer / self.seconds_per_move).clamp(0.0, 1.0);
+
+                ui.add_space(8.0);
+                ui.label(RichText::new(format!("Next move in: {:.1}s", remaining)).size(font_size - 1.0));
+                ui.add(egui::ProgressBar::new(progress).desired_width(combo_size.x));
+            }
+    });
+
+    if self.engine_plays != old_engine_plays {
+        self.engine_timer = 0.0;
+        self.last_frame_time = Instant::now();
     }
+}
     
     pub fn render_tiles(&self, painter: &Painter, origin: Pos2, board: &Board) {
         // Draw board
@@ -134,6 +150,51 @@ impl PlayTab
         }
         else {
             return;
+        }
+    }
+    pub fn render_game_over(&mut self, ctx: &Context) {
+        let mut popup_open = true;
+        let mut stay_open = true;
+        
+        if let PlayState::Playing(game_state) = self.state {
+            match game_state {
+                chess_lib::GameState::Playing => (),
+                chess_lib::GameState::Checkmate(_) => self.show_popup = true,
+                chess_lib::GameState::Stalemate(_) => self.show_popup = true,
+                chess_lib::GameState::InsufficientMaterial => self.show_popup = true,
+                chess_lib::GameState::FiftyMoveRule => self.show_popup = true,
+                chess_lib::GameState::ThreeRepetition => self.show_popup = true,
+            };
+            if !self.show_popup { return; }
+            let message = match game_state {
+                chess_lib::GameState::Checkmate(winner) => format!("Checkmate! {} wins.", if !winner { "White" } else { "Black" } ),
+                chess_lib::GameState::Stalemate(_) => "Stalemate! It's a draw.".to_string(),
+                chess_lib::GameState::InsufficientMaterial => "Draw: Insufficient material.".to_string(),
+                chess_lib::GameState::FiftyMoveRule => "Draw: 50-move rule.".to_string(),
+                chess_lib::GameState::ThreeRepetition => "Draw: Threefold repetition.".to_string(),
+                _ => return,
+            };
+            egui::Window::new("Game Over")
+                .open(&mut stay_open)
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    ui.label(message);
+    
+                    ui.horizontal(|ui| {
+                        if ui.button("New Game").clicked() {
+                            self.resest();
+                            popup_open = false;
+                        }
+    
+                        if ui.button("Close").clicked() {
+                            popup_open = false;
+                        }
+                    });
+                });
+    
+            self.show_popup = popup_open && stay_open;
         }
     }
 }
