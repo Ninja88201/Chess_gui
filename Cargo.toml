@@ -1,0 +1,17 @@
+[package]
+name = "egui_chess"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+egui = "0.31.1"
+chess_lib = { git = "https://github.com/Ninja88201/chess_lib.git" }
+chess_engine = { git = "https://github.com/Ninja88201/chess_engine.git" }
+eframe = "0.31.1"
+image = "0.25.6"
+rand = "0.9.1"
+getrandom = { version = "0.3.3", features = ["wasm_js"]}
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4.50"
+web-sys = "0.3.70"
