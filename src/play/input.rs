@@ -92,7 +92,7 @@ impl PlayTab {
 
         // Flip Board
         if input.key_pressed(Key::F) {
-            self.flipped = !self.flipped;
+            self.flip();
         }
 
         // Undo Move
@@ -105,14 +105,7 @@ impl PlayTab {
         
         // Make random move
         if input.key_pressed(Key::Space) {
-            let mut moves = MoveList::new();
-            self.board.generate_legal_moves(self.board.white_turn, &mut moves);
-            if !moves.is_empty() {
-                let random_index = self.rand.random_range(0..moves.len());
-                self.board.make_move_unchecked(moves[random_index]);
-            }
-            self.selected = None;
-            self.state = PlayState::Playing(chess_lib::GameState::Playing);
+            self.make_random();
         }
 
         // Exit program
@@ -122,23 +115,12 @@ impl PlayTab {
 
         // View previous move
         if input.key_pressed(Key::ArrowRight) {
-            if let PlayState::Viewing(pos) = self.state {
-                self.state = PlayState::Viewing(pos + 1)
-            }
+            self.view_next();
         }
 
         // View next move
         if input.key_pressed(Key::ArrowLeft) {
-            if let PlayState::Viewing(pos) = self.state {
-                if pos != 0 {
-                    self.state = PlayState::Viewing(pos - 1)
-                }
-            }
-            else {
-                if self.board.history.len() > 0 {
-                    self.state = PlayState::Viewing(self.board.history.len() - 1)
-                }
-            }
+            self.view_previous();
         }
     }
     pub fn handle_play_state(
@@ -171,5 +153,37 @@ impl PlayTab {
         ctx.input(|i| {
             self.utility_input(i);            
         });
+    }
+    pub fn make_random(&mut self) {
+        if !self.engine_turn() {
+            let mut moves = MoveList::new();
+            self.board.generate_legal_moves(self.board.white_turn, &mut moves);
+            if !moves.is_empty() {
+                let random_index = self.rand.random_range(0..moves.len());
+                self.board.make_move_unchecked(moves[random_index]);
+            }
+            self.selected = None;
+            self.state = PlayState::Playing(chess_lib::GameState::Playing);
+            self.engine_timer = 0.0;
+        }
+    }
+    pub fn view_previous(&mut self) {
+        if let PlayState::Viewing(pos) = self.state {
+            if pos != 0 {
+                self.state = PlayState::Viewing(pos - 1)
+            }
+        }
+        else {
+            if self.board.history.len() > 0 {
+                self.state = PlayState::Viewing(self.board.history.len() - 1)
+            }
+        }
+        self.selected = None;
+    }
+    pub fn view_next(&mut self) {
+        if let PlayState::Viewing(pos) = self.state {
+            self.state = PlayState::Viewing(pos + 1)
+        }
+        self.selected = None;
     }
 }

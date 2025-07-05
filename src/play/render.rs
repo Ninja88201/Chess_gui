@@ -1,7 +1,9 @@
-use std::time::Instant;
-
 use chess_lib::{Board, MoveList, Piece, Tile};
-use egui::{Color32, ComboBox, Context, Painter, Pos2, RichText, Ui, Vec2};
+use egui::{Color32, ComboBox, Context, Painter, Pos2, RichText, Vec2};
+#[cfg(not(target_arch = "wasm32"))]
+use std::fs;
+#[cfg(not(target_arch = "wasm32"))]
+use rfd::FileDialog;
 
 use crate::play::{state::{Engine, PlayState}, PlayTab};
 
@@ -50,7 +52,6 @@ impl PlayTab
         available_size.y * 0.8,
     );
 
-    let old_engine_plays = self.engine_plays;
 
     ui.vertical(|ui| {
         ui.label(RichText::new("Engine plays").size(font_size));
@@ -77,11 +78,6 @@ impl PlayTab
                 ui.add(egui::ProgressBar::new(progress).desired_width(combo_size.x));
             }
     });
-
-    if self.engine_plays != old_engine_plays {
-        self.engine_timer = 0.0;
-        self.last_frame_time = Instant::now();
-    }
 }
     
     pub fn render_tiles(&self, painter: &Painter, origin: Pos2, board: &Board) {
@@ -153,9 +149,6 @@ impl PlayTab
         }
     }
     pub fn render_game_over(&mut self, ctx: &Context) {
-        let mut popup_open = true;
-        let mut stay_open = true;
-        
         if let PlayState::Playing(game_state) = self.state {
             match game_state {
                 chess_lib::GameState::Playing => (),
@@ -175,26 +168,76 @@ impl PlayTab
                 _ => return,
             };
             egui::Window::new("Game Over")
-                .open(&mut stay_open)
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .frame(egui::Frame::popup(&ctx.style()))
+                .default_width(200.0)
+                .min_width(0.0)
+                .default_height(0.0)  
+                .min_height(0.0)          
                 .show(ctx, |ui| {
                     ui.label(message);
-    
-                    ui.horizontal(|ui| {
-                        if ui.button("New Game").clicked() {
-                            self.resest();
-                            popup_open = false;
-                        }
-    
-                        if ui.button("Close").clicked() {
-                            popup_open = false;
-                        }
-                    });
+                    ui.add_space(10.0);
+
+                    ui.with_layout(
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            if ui.button("New Game").clicked() {
+                                self.reset();
+                                self.show_popup = false;
+                            }
+
+                            ui.add_space(8.0);
+
+                            if ui.button("Save Game").clicked() {
+                                let pgn = self.board.to_pgn();
+
+                                #[cfg(target_arch = "wasm32")]
+                                Self::download_pgn_web(&pgn);
+
+                                #[cfg(not(target_arch = "wasm32"))]
+                                Self::download_pgn_native(&pgn);
+                            }
+                        },
+                    );
                 });
-    
-            self.show_popup = popup_open && stay_open;
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    pub fn download_pgn_web(pgn: &str) {
+        use web_sys::wasm_bindgen::JsCast;
+        use web_sys::{Blob, Url, HtmlAnchorElement};
+
+        let array = js_sys::Array::new();
+        array.push(&web_sys::wasm_bindgen::JsValue::from_str(pgn));
+
+        let blob = Blob::new_with_str_sequence(&array).unwrap();
+        let url = Url::create_object_url_with_blob(&blob).unwrap();
+
+        let window = web_sys::window().unwrap();
+        let document = window.document().unwrap();
+        let a = document
+            .create_element("a")
+            .unwrap()
+            .unchecked_into::<HtmlAnchorElement>();
+
+        a.set_href(&url);
+        a.set_download("game.pgn");
+        a.click();
+
+        Url::revoke_object_url(&url).ok();
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn download_pgn_native(pgn: &str) {
+        if let Some(path) = FileDialog::new()
+            .set_file_name("game.pgn")
+            .add_filter("PGN", &["pgn"])
+            .save_file()
+        {
+            if let Err(e) = fs::write(&path, pgn) {
+                eprintln!("Failed to save PGN file: {}", e);
+            }
         }
     }
 }

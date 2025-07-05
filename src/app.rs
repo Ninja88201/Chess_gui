@@ -25,7 +25,7 @@ impl ChessApp
             current_tab: Tab::Play,
             play_tab: 
                 PlayTab::new(
-                    None,
+                    Some("2N1N3/1N3N2/8/1N3N2/2N1N3/8/8/k6K w - - 0 1"),
                     load_atlas(ctx),
                 ),
                 position_tab: PositionTab::new(),

@@ -2,8 +2,8 @@ use egui::{ColorImage, Context, TextureHandle};
 #[cfg(target_arch = "wasm32")]
 use image::GenericImageView;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
+// #[cfg(target_arch = "wasm32")]
+// use wasm_bindgen::prelude::*;
 
 
 pub fn load_atlas(ctx: &Context) -> TextureHandle {
@@ -26,7 +26,7 @@ pub fn load_atlas(ctx: &Context) -> TextureHandle {
 
     #[cfg(target_arch = "wasm32")]
     {
-        let bytes = include_bytes!("assets/PieceAtlas.png"); // embed at compile time
+        let bytes = include_bytes!("../assets/PieceAtlas.png"); // embed at compile time
         let img = image::load_from_memory(bytes).expect("failed to load atlas image");
         let size = img.dimensions();
         let rgba = img.to_rgba8();

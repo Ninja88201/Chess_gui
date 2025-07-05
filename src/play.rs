@@ -1,9 +1,10 @@
-use std::{ops::RangeInclusive, time::Instant};
+use std::ops::RangeInclusive;
 
 use chess_engine::search::find_best_move;
-use chess_lib::{Board, Tile};
+use chess_lib::{Board, MoveList, Tile};
 use egui::{Context, Layout, RichText, Slider, TextureHandle, Ui, Vec2};
-use rand::rngs::ThreadRng;
+use rand::{rngs::ThreadRng, Rng};
+use instant::Instant;
 
 mod helper;
 mod render;
@@ -73,12 +74,15 @@ impl PlayTab
         }
 
     }
-    pub fn resest(&mut self) {
+    pub fn reset(&mut self) {
         self.board = Board::new();
         self.view_board = Board::new();
 
         self.state = PlayState::Playing(chess_lib::GameState::Playing);
         self.show_popup = true;
+    }
+    pub fn flip(&mut self) {
+        self.flipped = !self.flipped;
     }
     pub fn engine_turn(&self) -> bool {
         let engine = self.engine_plays;
@@ -92,24 +96,29 @@ impl PlayTab
         if (turn && engine == Engine::White) || (!turn && engine == Engine::Black) {
             return true;
         }
-        unreachable!()
+        false
     }
     pub fn render(&mut self, ctx: &Context) {
+        let old_engine_plays = self.engine_plays;
+
         let now = Instant::now();
         let dt = now.duration_since(self.last_frame_time).as_secs_f32();
         self.last_frame_time = now;
+        if let PlayState::Playing(_) = self.state {
 
-        self.engine_timer += dt;
+            self.engine_timer += dt;
 
-        if self.engine_turn()  {
-            if self.engine_timer >= self.seconds_per_move {
-                self.engine_timer = 0.0;
-
-                if let Some(m) = find_best_move(&mut self.board, 4) {
-                    self.board.make_move_unchecked(m);
+            if self.engine_turn()  {
+                if self.engine_timer >= self.seconds_per_move {
+                    self.engine_timer = 0.0;
+    
+                    if let Some(m) = find_best_move(&mut self.board, 4) {
+                        self.board.make_move_unchecked(m);
+                        self.state = PlayState::Playing(self.board.get_state());
+                    }
+                } else {
+                    ctx.request_repaint();
                 }
-            } else {
-                ctx.request_repaint();
             }
         }
 
@@ -128,8 +137,8 @@ impl PlayTab
             } else {
                 let delta = pos - curr_pos;
                 for i in 0..delta {
-                    if let Some(&mv) = self.board.history.get(curr_pos + i) {
-                        self.view_board.make_move_unchecked(mv);
+                    if let Some((mv, _)) = self.board.history.get(curr_pos + i) {
+                        self.view_board.make_move_unchecked(*mv);
                     }
                 }
             }
@@ -138,7 +147,12 @@ impl PlayTab
         // Render history first as render_board can modify history part way through a frame
         self.render_history(ctx);
         self.render_board(ctx);
-        self.render_game_over(ctx);
+        // self.render_game_over(ctx);
+
+        if self.engine_plays != old_engine_plays {
+            self.engine_timer = 0.0;
+            self.last_frame_time = Instant::now();
+        }
     }
     fn separator_drag(
         &mut self,
@@ -220,11 +234,11 @@ impl PlayTab
                     };
 
                     if idx < move_count {
-                        let mv = &moves[idx];
+                        let (_, san) = &moves[idx];
                         let is_current =
                             matches!(self.state, PlayState::Viewing(pos) if pos == idx + 1);
 
-                        let button = egui::Button::new(format!("{}. {}", idx + 1, mv))
+                        let button = egui::Button::new(format!("{}. {}", idx + 1, san))
                             .min_size(button_size);
 
                         let button = if is_current {
@@ -345,12 +359,50 @@ impl PlayTab
             .auto_shrink([false, true])
             .show(ui, |ui| {
                 self.render_engine_side_selector(ui);
+
                 ui.add_space(8.0);
+
                 ui.checkbox(&mut self.auto_queen, "Auto-queen:");
+
                 ui.add_space(8.0);
+
                 ui.label("Seconds/Move");
                 let slider = Slider::new(&mut self.seconds_per_move, RangeInclusive::new(0.1, 5.0));
                 ui.add(slider);
+
+                ui.add_space(8.0);
+
+                if ui.button("Flip Board").clicked() {
+                    self.flip();
+                }
+
+                ui.add_space(8.0);
+
+                if ui.button("New Game").clicked() {
+                    self.reset();
+                }
+
+                ui.add_space(8.0);
+
+                if ui.button("Undo Move").clicked() {
+                    self.board.undo_move();
+                }
+
+                ui.add_space(8.0);
+
+                if ui.button("Make random move").clicked() {
+                    if !self.engine_turn() {
+                        let mut moves = MoveList::new();
+                        self.board.generate_legal_moves(self.board.white_turn, &mut moves);
+                        if !moves.is_empty() {
+                            let random_index = self.rand.random_range(0..moves.len());
+                            self.board.make_move_unchecked(moves[random_index]);
+                        }
+                        self.selected = None;
+                        self.state = PlayState::Playing(chess_lib::GameState::Playing);
+                        self.engine_timer = 0.0;
+                    }
+                }
         });
     }
     pub fn render_board(&mut self, ctx: &Context) {
@@ -384,6 +436,7 @@ impl PlayTab
                 self.render_moves(&painter, origin, board);
 
                 self.handle_play_state(ui, ctx, response, origin);
+                self.render_game_over(ctx);
                 
 
 
