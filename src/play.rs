@@ -145,7 +145,7 @@ impl PlayTab
             
         }
         // Render history first as render_board can modify history part way through a frame
-        self.render_history(ctx);
+        self.render_panels(ctx);
         self.render_board(ctx);
         // self.render_game_over(ctx);
 
@@ -260,7 +260,7 @@ impl PlayTab
         }
     }
 
-    pub fn render_history(&mut self, ctx: &egui::Context) {
+    pub fn render_panels(&mut self, ctx: &egui::Context) {
         let screen_size = ctx.screen_rect();
         let is_portrait = screen_size.height() > screen_size.width();
 
