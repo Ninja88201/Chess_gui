@@ -1,4 +1,4 @@
-use chess_lib::Piece;
+use chess_lib::{Colour, Piece};
 use egui::{Pos2, Rect, Vec2};
 
 use crate::play::PlayTab;
@@ -16,15 +16,23 @@ impl PlayTab {
     }
     pub fn screen_to_tile(&self, pos: Pos2, origin: Pos2) -> (usize, usize) {
         let ts = self.board_size / 8.0;
-        let file = ((pos.x - origin.x) / (ts)) as usize;
-        let rank = ((pos.y - origin.y) / (ts)) as usize;
-        let (x, y) = match self.flipped {
-            true => (7 - file, rank),
-            false => (file, 7 - rank),
+
+        let mut file = ((pos.x - origin.x) / ts) as isize;
+        let mut rank = ((pos.y - origin.y) / ts) as isize;
+
+        // Clamp to valid range
+        file = file.clamp(0, 7);
+        rank = rank.clamp(0, 7);
+
+        let (x, y) = if self.flipped {
+            (7 - file as usize, rank as usize)
+        } else {
+            (file as usize, 7 - rank as usize)
         };
+
         (x, y)
     }
-    pub fn atlas_uv(&self, piece: &Piece, colour: bool) -> Rect {
+    pub fn atlas_uv(&self, piece: &Piece, colour: Colour) -> Rect {
         // ------------  layout description  ----------------
         //   col: 0     1      2
         // row 0: WPawn WKnight WBishop
@@ -33,19 +41,19 @@ impl PlayTab {
         // row 3: BRook BQueen  BKing
         // -----------------------------------------------
         let (row, col) = match (piece, colour) {
-            (Piece::Pawn  , true) => (0, 0),
-            (Piece::Knight, true) => (0, 1),
-            (Piece::Bishop, true) => (0, 2),
-            (Piece::Rook  , true) => (1, 0),
-            (Piece::Queen , true) => (1, 1),
-            (Piece::King  , true) => (1, 2),
+            (Piece::Pawn  , Colour::White) => (0, 0),
+            (Piece::Knight, Colour::White) => (0, 1),
+            (Piece::Bishop, Colour::White) => (0, 2),
+            (Piece::Rook  , Colour::White) => (1, 0),
+            (Piece::Queen , Colour::White) => (1, 1),
+            (Piece::King  , Colour::White) => (1, 2),
     
-            (Piece::Pawn  , false) => (2, 0),
-            (Piece::Knight, false) => (2, 1),
-            (Piece::Bishop, false) => (2, 2),
-            (Piece::Rook  , false) => (3, 0),
-            (Piece::Queen , false) => (3, 1),
-            (Piece::King  , false) => (3, 2),
+            (Piece::Pawn  , Colour::Black) => (2, 0),
+            (Piece::Knight, Colour::Black) => (2, 1),
+            (Piece::Bishop, Colour::Black) => (2, 2),
+            (Piece::Rook  , Colour::Black) => (3, 0),
+            (Piece::Queen , Colour::Black) => (3, 1),
+            (Piece::King  , Colour::Black) => (3, 2),
         };
     
         let atlas_sz = self.atlas.size_vec2();

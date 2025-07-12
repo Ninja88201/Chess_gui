@@ -1,4 +1,4 @@
-use chess_lib::{Board, Piece, Tile};
+use chess_lib::{Board, Colour, Piece, Tile};
 use egui::{Color32, Context, Painter, Pos2, RichText, Vec2};
 
 use crate::position_creator::PositionTab;
@@ -38,7 +38,7 @@ impl PositionTab
                         let t = Tile::new_xy(x as u8, y as u8);
                         if let Some(tile) = t {
                             if let Some((p, w)) = self.board.get_piece_at_tile(tile) {
-                                if w {
+                                if w == Colour::White {
                                     self.board.white.remove_piece_type(p, tile);
                                 } else {
                                     self.board.black.remove_piece_type(p, tile);
@@ -60,8 +60,8 @@ impl PositionTab
                                     self.board.black.place_piece(piece, tile);
                                 }
                             } else { 
-                                if let Some((p, w)) = self.board.get_piece_at_tile(tile) {
-                                    if w {
+                                if let Some((p, c)) = self.board.get_piece_at_tile(tile) {
+                                    if c == Colour::White {
                                         self.board.white.remove_piece_type(p, tile);
                                     } else {
                                         self.board.black.remove_piece_type(p, tile);

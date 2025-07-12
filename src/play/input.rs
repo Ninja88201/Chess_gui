@@ -157,7 +157,7 @@ impl PlayTab {
     pub fn make_random(&mut self) {
         if !self.engine_turn() {
             let mut moves = MoveList::new();
-            self.board.generate_legal_moves(self.board.white_turn, &mut moves);
+            self.board.generate_legal_moves(self.board.turn, &mut moves);
             if !moves.is_empty() {
                 let random_index = self.rand.random_range(0..moves.len());
                 self.board.make_move_unchecked(moves[random_index]);

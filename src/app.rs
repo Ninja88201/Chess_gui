@@ -51,7 +51,8 @@ impl eframe::App for ChessApp {
             let position = self.position_tab.board.to_fen();
             match Board::new_from_fen(&position) {
                 Ok(b) => {
-                    self.play_tab.board = b;
+                    self.play_tab.board = b.clone();
+                    self.play_tab.view_board = b;
                     self.current_tab = Tab::Play;
                 },
                 Err(e) => {

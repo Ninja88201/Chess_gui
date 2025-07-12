@@ -1,4 +1,4 @@
-use chess_lib::{Board, MoveList, Piece, Tile};
+use chess_lib::{Board, Colour, MoveList, Piece, Tile};
 use egui::{Color32, ComboBox, Context, Painter, Pos2, RichText, Vec2};
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs;
@@ -30,7 +30,7 @@ impl PlayTab
             let pos_rect = rect.translate(Vec2::new(0.0, tile_size * i as f32));
             let response = ui.put(pos_rect, egui::Button::new("").corner_radius(0.0));
 
-            let uv = self.atlas_uv(&piece, self.board.white_turn);
+            let uv = self.atlas_uv(&piece, self.board.turn);
             let painter = ui.painter();
 
             painter.image(self.atlas.id(), pos_rect, uv, Color32::WHITE);
@@ -82,8 +82,8 @@ impl PlayTab
     
     pub fn render_tiles(&self, painter: &Painter, origin: Pos2, board: &Board) {
         // Draw board
-        let white_check = board.is_in_check(true);
-        let black_check = board.is_in_check(false);
+        let white_check = board.is_in_check(Colour::White);
+        let black_check = board.is_in_check(Colour::Black);
 
         let w_king = board.white.king_tile();
         let b_king = board.black.king_tile();
@@ -110,10 +110,10 @@ impl PlayTab
         }
     }
     pub fn render_pieces(&self, painter: &Painter, origin: Pos2, board: &Board) {
-        for (is_white, player) in [(true, &board.white), (false, &board.black)] {
+        for (colour, player) in [(Colour::White, &board.white), (Colour::Black, &board.black)] {
             for (i, bb) in player.bb.iter().enumerate() {
                 let piece = Piece::from_index(i);
-                let uv_rect = self.atlas_uv(&piece, is_white);
+                let uv_rect = self.atlas_uv(&piece, colour);
                 for t in bb.iter() {
                     let (x, y) = t.get_coords();
                     painter.image(
@@ -160,7 +160,7 @@ impl PlayTab
             };
             if !self.show_popup { return; }
             let message = match game_state {
-                chess_lib::GameState::Checkmate(winner) => format!("Checkmate! {} wins.", if !winner { "White" } else { "Black" } ),
+                chess_lib::GameState::Checkmate(loser) => format!("Checkmate! {} wins.", if loser.white() { "Black" } else { "White" } ),
                 chess_lib::GameState::Stalemate(_) => "Stalemate! It's a draw.".to_string(),
                 chess_lib::GameState::InsufficientMaterial => "Draw: Insufficient material.".to_string(),
                 chess_lib::GameState::FiftyMoveRule => "Draw: 50-move rule.".to_string(),

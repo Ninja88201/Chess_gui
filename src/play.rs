@@ -92,8 +92,8 @@ impl PlayTab
         if engine == Engine::Both {
             return true;
         }
-        let turn = self.board.white_turn;
-        if (turn && engine == Engine::White) || (!turn && engine == Engine::Black) {
+        let turn = self.board.turn;
+        if (turn.white() && engine == Engine::White) || (turn.black() && engine == Engine::Black) {
             return true;
         }
         false
@@ -112,7 +112,7 @@ impl PlayTab
                 if self.engine_timer >= self.seconds_per_move {
                     self.engine_timer = 0.0;
     
-                    if let Some(m) = find_best_move(&mut self.board, 4) {
+                    if let Some(m) = find_best_move(&mut self.board, 6) {
                         self.board.make_move_unchecked(m);
                         self.state = PlayState::Playing(self.board.get_state());
                     }
@@ -137,8 +137,8 @@ impl PlayTab
             } else {
                 let delta = pos - curr_pos;
                 for i in 0..delta {
-                    if let Some((mv, _)) = self.board.history.get(curr_pos + i) {
-                        self.view_board.make_move_unchecked(*mv);
+                    if let Some(h) = self.board.history.get(curr_pos + i) {
+                        self.view_board.make_move_unchecked(h.last_move);
                     }
                 }
             }
@@ -234,11 +234,11 @@ impl PlayTab
                     };
 
                     if idx < move_count {
-                        let (_, san) = &moves[idx];
+                        let h = &moves[idx];
                         let is_current =
                             matches!(self.state, PlayState::Viewing(pos) if pos == idx + 1);
 
-                        let button = egui::Button::new(format!("{}. {}", idx + 1, san))
+                        let button = egui::Button::new(format!("{}. {}", idx + 1, h.san_string))
                             .min_size(button_size);
 
                         let button = if is_current {
@@ -393,7 +393,7 @@ impl PlayTab
                 if ui.button("Make random move").clicked() {
                     if !self.engine_turn() {
                         let mut moves = MoveList::new();
-                        self.board.generate_legal_moves(self.board.white_turn, &mut moves);
+                        self.board.generate_legal_moves(self.board.turn, &mut moves);
                         if !moves.is_empty() {
                             let random_index = self.rand.random_range(0..moves.len());
                             self.board.make_move_unchecked(moves[random_index]);

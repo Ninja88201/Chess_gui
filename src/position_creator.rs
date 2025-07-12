@@ -1,4 +1,4 @@
-use chess_lib::{Board, CastlingRights, Piece};
+use chess_lib::{Board, CastlingRights, Colour, Piece};
 use egui::{load::SizedTexture, Color32, ComboBox, Context, Image, ImageButton, Key, TextureHandle, Ui, Vec2};
 
 mod helper;
@@ -130,12 +130,12 @@ impl PositionTab
         ui.add_space(8.0);
 
         ui.label("Select board turn");
-        let text = if self.board.white_turn { "White" } else { "Black" };
+        let text = if self.board.turn.white() { "White" } else { "Black" };
         ComboBox::from_id_salt("board_turn")
             .selected_text(text)
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.board.white_turn, true, "White");
-                ui.selectable_value(&mut self.board.white_turn, false, "Black");
+                ui.selectable_value(&mut self.board.turn, Colour::White, "White");
+                ui.selectable_value(&mut self.board.turn, Colour::Black, "Black");
             });
 
         ui.add_space(8.0);
